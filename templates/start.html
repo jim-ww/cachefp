@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8"/>
+        <title>Loading…</title>
+        <meta name="robots" content="noindex"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <style>
+            html, body { margin: 0; width: 100%; height: 100%; padding: 0; background: #202020; }
+        </style>
+    </head>
+    <body>
+        <script type="module">
+            const prefix = "{{prefix}}";
+
+            const cookie = (name) =>
+                (document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`)) || [])[2];
+            const getJSON = async (path) => {
+                const res = await fetch(path, { credentials: "same-origin" });
+                return res.json();
+            };
+
+            // Fetching a probe route resolves the moment the browser has an
+            // answer, whether that's a genuine round trip to /f/{ref} or an
+            // instant cache hit — so, unlike a fire-and-hope timeout, this
+            // can never race ahead of an in-flight request. The URL must
+            // stay byte-for-byte identical across visits: any cache-busting
+            // query param here would defeat the entire mechanism, since a
+            // cache hit is exactly the signal being observed.
+            const probe = (route) => fetch(`${prefix}/f/${route}`, { credentials: "same-origin" });
+            const probeAll = async (routes) => {
+                for (const route of routes) await probe(route);
+            };
+
+            const run = async () => {
+                await fetch("{{beaconHref}}", { credentials: "same-origin" });
+
+                const mid = cookie("cfp_mid");
+                if (mid) {
+                    const manifest = await getJSON(`${prefix}/begin/write/${mid}`);
+                    await probeAll(manifest.routes);
+                }
+
+                let manifest = await getJSON(`${prefix}/begin/read`);
+                await probeAll(manifest.routes);
+
+                let result = await getJSON(`${prefix}/identity`);
+                while (result.retry) {
+                    await probeAll(result.retry.routes);
+                    manifest = await getJSON(`${prefix}/begin/read`);
+                    await probeAll(manifest.routes);
+                    result = await getJSON(`${prefix}/identity`);
+                }
+
+                window.location.replace(result.returnPath || "/");
+            };
+            run();
+        </script>
+    </body>
+</html>
