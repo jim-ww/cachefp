@@ -83,3 +83,13 @@ func (s *JSONStore) Set(key string, value any) {
 	s.data[key] = value
 	s.save()
 }
+
+type InMemoryStore sync.Map
+
+func (s *InMemoryStore) Get(key string) (any, bool) {
+	return (*sync.Map)(s).Load(key)
+}
+
+func (s *InMemoryStore) Set(key string, value any) {
+	(*sync.Map)(s).Store(key, value)
+}
