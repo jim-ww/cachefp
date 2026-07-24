@@ -6,16 +6,16 @@ import (
 	"strings"
 )
 
-// RouteTable is the ordered, fixed set of favicon-cache probe routes for one
+// routeTable is the ordered, fixed set of favicon-cache probe routes for one
 // cache identifier, plus the bit<->route conversions used to encode/decode
 // a visitor's cache profile.
-type RouteTable struct {
+type routeTable struct {
 	cacheID string
 	routes  []string
 	index   map[string]int
 }
 
-func NewRouteTable(cacheID string, n int) *RouteTable {
+func newRouteTable(cacheID string, n int) *routeTable {
 	base := createRoutes(cacheID, n)
 	routes := make([]string, n)
 	index := make(map[string]int, n)
@@ -24,24 +24,24 @@ func NewRouteTable(cacheID string, n int) *RouteTable {
 		routes[i] = full
 		index[full] = i
 	}
-	return &RouteTable{cacheID: cacheID, routes: routes, index: index}
+	return &routeTable{cacheID: cacheID, routes: routes, index: index}
 }
 
-func (t *RouteTable) Len() int { return len(t.routes) }
+func (t *routeTable) Len() int { return len(t.routes) }
 
-func (t *RouteTable) HasRoute(route string) bool {
+func (t *routeTable) HasRoute(route string) bool {
 	_, ok := t.index[route]
 	return ok
 }
 
-func (t *RouteTable) RouteByIndex(i int) string {
+func (t *routeTable) RouteByIndex(i int) string {
 	if i < 0 || i >= len(t.routes) {
 		return ""
 	}
 	return t.routes[i]
 }
 
-func (t *RouteTable) IndexByRoute(route string) int {
+func (t *routeTable) IndexByRoute(route string) int {
 	if i, ok := t.index[route]; ok {
 		return i
 	}
@@ -49,7 +49,7 @@ func (t *RouteTable) IndexByRoute(route string) int {
 }
 
 // NextRoute returns the route after `route`, or "" once the table is exhausted.
-func (t *RouteTable) NextRoute(route string) string {
+func (t *routeTable) NextRoute(route string) string {
 	i, ok := t.index[route]
 	if !ok {
 		return ""
@@ -58,7 +58,7 @@ func (t *RouteTable) NextRoute(route string) string {
 }
 
 // Vector returns the routes whose bit is set in identifier (bit i <-> routes[i]).
-func (t *RouteTable) Vector(identifier uint32) []string {
+func (t *routeTable) Vector(identifier uint32) []string {
 	bin := []byte(fmt32b(identifier, len(t.routes)))
 	slices.Reverse(bin)
 	vector := make([]string, 0, len(t.routes))
@@ -72,7 +72,7 @@ func (t *RouteTable) Vector(identifier uint32) []string {
 
 // Identifier reconstructs the numeric identifier from a set of visited routes,
 // only considering the first `size` routes in the table.
-func (t *RouteTable) Identifier(visited map[string]bool, size int) uint64 {
+func (t *routeTable) Identifier(visited map[string]bool, size int) uint64 {
 	if size > len(t.routes) {
 		size = len(t.routes)
 	}

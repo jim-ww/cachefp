@@ -89,9 +89,9 @@ func (o Options) withDefaults() Options {
 type Middleware struct {
 	opts        Options
 	store       Store
-	routes      *RouteTable
-	profiles    *ProfileStore
-	writeTokens *WriteTokenSet
+	routes      *routeTable
+	profiles    *profileStore
+	writeTokens *writeTokenSet
 	cacheID     string
 	maxN        uint64
 }
@@ -114,16 +114,16 @@ func New(opts Options) *Middleware {
 	return &Middleware{
 		opts:        opts,
 		store:       store,
-		routes:      NewRouteTable(cacheID, opts.ProbeBits),
-		profiles:    NewProfileStore(),
-		writeTokens: NewWriteTokenSet(),
+		routes:      newRouteTable(cacheID, opts.ProbeBits),
+		profiles:    newProfileStore(),
+		writeTokens: newWriteTokenSet(),
 		cacheID:     cacheID,
 		maxN:        1<<uint(opts.ProbeBits) - 1,
 	}
 }
 
-// Hash renders a decoded identifier as a short, human-readable string.
-func Hash(id uint64) string { return hashNumber(id) }
+// hash renders a decoded identifier as a short, human-readable string.
+func hash(id uint64) string { return hashNumber(id) }
 
 const (
 	cookieUID      = "cfp_uid"
@@ -156,7 +156,7 @@ func (m *Middleware) handlePassthrough(next http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if v := cookieValue(r, m.opts.CookieName); v != "" {
 			if id, err := strconv.ParseUint(v, 10, 64); err == nil {
-				ident := Identifier{ID: id, Hash: Hash(id), Identified: id != 0}
+				ident := Identifier{ID: id, Hash: hash(id), Identified: id != 0}
 				next.ServeHTTP(w, r.WithContext(withIdentifier(r.Context(), ident)))
 				return
 			}
@@ -248,7 +248,7 @@ func (m *Middleware) handleBeginWrite(w http.ResponseWriter, r *http.Request) {
 // beginWrite creates a fresh write-mode profile for the next unassigned
 // identifier and sets its session cookie, returning the probe routes to
 // walk. Shared by handleBeginWrite and the retry path in handleIdentity.
-func (m *Middleware) beginWrite() (*Profile, []string) {
+func (m *Middleware) beginWrite() (*profile, []string) {
 	uid := newUUID()
 	index := getUint64(m.store, "index", 1)
 	m.opts.Logf("cachefp | unknown visitor uid=%q assigned index=%d", uid, index)
@@ -275,7 +275,7 @@ func (m *Middleware) routeSlice(count int) []string {
 // profile's session cookie to the response (beginWrite itself has no
 // http.ResponseWriter, since it's also called from handleIdentity where the
 // cookie is set alongside other response state).
-func setUIDCookie(w http.ResponseWriter, profile *Profile) {
+func setUIDCookie(w http.ResponseWriter, profile *profile) {
 	setCookie(w, cookieUID, profile.uid, time.Minute)
 }
 
@@ -363,7 +363,7 @@ func (m *Middleware) handleIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m.opts.Logf("cachefp | visitor identified as %s (#%d)", Hash(identifier), identifier)
+	m.opts.Logf("cachefp | visitor identified as %s (#%d)", hash(identifier), identifier)
 	m.finish(w, r, identifier, true)
 }
 
@@ -377,7 +377,7 @@ func (m *Middleware) finish(w http.ResponseWriter, r *http.Request, id uint64, i
 	}
 	if identified {
 		value = strconv.FormatUint(id, 10)
-		result.Hash = Hash(id)
+		result.Hash = hash(id)
 		result.ID = id
 	}
 	setCookie(w, m.opts.CookieName, value, m.opts.CookieMaxAge)

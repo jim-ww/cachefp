@@ -5,8 +5,8 @@ import (
 	"sync"
 )
 
-// Profile tracks one visitor across the write (encode) or read (decode) flow.
-type Profile struct {
+// profile tracks one visitor across the write (encode) or read (decode) flow.
+type profile struct {
 	mu          sync.Mutex
 	uid         string
 	vector      []string
@@ -16,17 +16,17 @@ type Profile struct {
 	storageSize int
 }
 
-// ProfileStore is a concurrency-safe registry of in-flight profiles, keyed by uid.
-type ProfileStore struct {
+// profileStore is a concurrency-safe registry of in-flight profiles, keyed by uid.
+type profileStore struct {
 	mu    sync.Mutex
-	byUID map[string]*Profile
+	byUID map[string]*profile
 }
 
-func NewProfileStore() *ProfileStore {
-	return &ProfileStore{byUID: map[string]*Profile{}}
+func newProfileStore() *profileStore {
+	return &profileStore{byUID: map[string]*profile{}}
 }
 
-func (s *ProfileStore) Get(uid string) *Profile {
+func (s *profileStore) Get(uid string) *profile {
 	if uid == "" {
 		return nil
 	}
@@ -35,19 +35,19 @@ func (s *ProfileStore) Get(uid string) *Profile {
 	return s.byUID[uid]
 }
 
-func (s *ProfileStore) Has(uid string) bool {
+func (s *profileStore) Has(uid string) bool {
 	return s.Get(uid) != nil
 }
 
 // FromWrite creates a profile bound to a known identifier (write mode).
 // Returns nil if uid is already registered.
-func (s *ProfileStore) FromWrite(uid string, identifier uint64, routes *RouteTable) *Profile {
+func (s *profileStore) FromWrite(uid string, identifier uint64, routes *routeTable) *profile {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.byUID[uid]; exists {
 		return nil
 	}
-	p := &Profile{
+	p := &profile{
 		uid:        uid,
 		identifier: identifier,
 		hasID:      true,
@@ -60,67 +60,67 @@ func (s *ProfileStore) FromWrite(uid string, identifier uint64, routes *RouteTab
 
 // FromRead creates a profile with no known identifier yet (read mode).
 // Returns nil if uid is already registered.
-func (s *ProfileStore) FromRead(uid string) *Profile {
+func (s *profileStore) FromRead(uid string) *profile {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, exists := s.byUID[uid]; exists {
 		return nil
 	}
-	p := &Profile{uid: uid, visited: map[string]bool{}}
+	p := &profile{uid: uid, visited: map[string]bool{}}
 	s.byUID[uid] = p
 	return p
 }
 
-func (p *Profile) IsReading() bool {
+func (p *profile) IsReading() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return !p.hasID
 }
 
-func (p *Profile) Vector() []string {
+func (p *profile) Vector() []string {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.vector
 }
 
-func (p *Profile) Identifier() uint64 {
+func (p *profile) Identifier() uint64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.identifier
 }
 
-func (p *Profile) VisitRoute(route string) {
+func (p *profile) VisitRoute(route string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.visited[route] = true
 }
 
-func (p *Profile) HasVisited(route string) bool {
+func (p *profile) HasVisited(route string) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.visited[route]
 }
 
-func (p *Profile) VisitedCount() int {
+func (p *profile) VisitedCount() int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return len(p.visited)
 }
 
-func (p *Profile) SetStorageSize(size int) {
+func (p *profile) SetStorageSize(size int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.storageSize = size
 }
 
-func (p *Profile) StorageSize() int {
+func (p *profile) StorageSize() int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.storageSize
 }
 
 // CalcIdentifier decodes the identifier from visited routes (read mode) and caches it.
-func (p *Profile) CalcIdentifier(routes *RouteTable) uint64 {
+func (p *profile) CalcIdentifier(routes *routeTable) uint64 {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.identifier = routes.Identifier(p.visited, p.storageSize)
@@ -128,13 +128,13 @@ func (p *Profile) CalcIdentifier(routes *RouteTable) uint64 {
 	return p.identifier
 }
 
-func (p *Profile) VectorContains(route string) bool {
+func (p *profile) VectorContains(route string) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return slices.Contains(p.vector, route)
 }
 
-func (s *ProfileStore) Delete(uid string) {
+func (s *profileStore) Delete(uid string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.byUID, uid)
